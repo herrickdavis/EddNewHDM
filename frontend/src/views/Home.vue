@@ -149,6 +149,25 @@ const exportar = async (format) => {
         alert("Ocurrió un error al exportar el archivo");
     }
 };
+const exportarFiltrado = async (format) => {
+    if (!selectedQuery.value) {
+        alert("Seleccione una consulta primero");
+        return;
+    }
+
+    try {
+        const url = `http://127.0.0.1:8000/api/queries/run/${selectedQuery.value}/export_filtered?format=${format}`;
+        const response = await fetch(url, { method: "POST" });
+        if (!response.ok) throw new Error(`Error al exportar: ${response.status}`);
+        const blob = await response.blob();
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `resultado_filtrado.${format}`;
+        link.click();
+    } catch (error) {
+        alert("Error al exportar filtrado: " + error.message);
+    }
+};
 
 onMounted(() => {
     cargarConsultas();
@@ -228,6 +247,8 @@ onMounted(() => {
                 <button class="btn btn-primary me-2" @click="exportar('csv')">📄 CSV</button>
                 <button class="btn btn-secondary me-2" @click="exportar('txt')">🧾 TXT</button>
                 <button class="btn btn-warning me-2" @click="exportar('xml')">🧬 XML</button>
+                <button class="btn btn-danger me-2" @click="exportarFiltrado('xlsx')">🎯 XLSX (filtrado)</button>
+
             </div>
         </div>
     </div>

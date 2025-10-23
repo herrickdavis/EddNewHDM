@@ -7,12 +7,19 @@ from sqlalchemy import create_engine
 from app.routers import main_router
 from app.models.base import Base
 
-app = FastAPI(title="EDD Backend", version="0.1.0")
+#app = FastAPI(title="EDD Backend", version="0.1.0")
+app = FastAPI()
 
 # === CORS (debe ir antes de incluir routers) ===
+from fastapi.middleware.cors import CORSMiddleware
+
+# ✅ CORS CONFIG
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

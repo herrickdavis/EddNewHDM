@@ -157,8 +157,10 @@ def export_query_filtered(query_id: int, format: str = "xlsx", db: Session = Dep
 
 # ✅ Vista previa de una plantilla y su consulta asociada
 # ✅ Vista previa de una plantilla y su consulta asociada (aplica layout_json)
+# ✅ Vista previa de una plantilla y su consulta asociada (aplica layout_json + rules_json)
 @router.get("/templates/{template_id}/preview")
 def preview_template(template_id: int, db: Session = Depends(get_db)):
+    from json_logic import jsonLogic  # usa json-logic-qubit instalado como json_logic
     tpl = db.query(models.Template).filter(models.Template.id == template_id).first()
     if not tpl:
         raise HTTPException(status_code=404, detail="Template no encontrado")
@@ -167,25 +169,33 @@ def preview_template(template_id: int, db: Session = Depends(get_db)):
     if not q:
         raise HTTPException(status_code=404, detail="Consulta asociada no encontrada")
 
-    # Ejecutar la consulta original
+    # 1) Ejecutar consulta asociada
     data = run_query(db, q.id, params={})
     rows = data.get("rows", [])
     columns = data.get("columns", [])
 
-    # Aplicar layout_json si existe
+    # 2) Aplicar rules_json si existe (filtra filas)
+    rule = getattr(tpl, "rules_json", None)
+    if rule:
+        try:
+            import json
+            if isinstance(rule, str):
+                rule = json.loads(rule)
+            rows = [r for r in rows if jsonLogic(rule, r)]
+        except Exception as e:
+            print(f"[preview] Error aplicando rules_json: {e}")
+
+    # 3) Aplicar layout_json.columns si existe (selección y orden de columnas)
     layout = getattr(tpl, "layout_json", None)
-    selected_columns = []
-
     if layout and isinstance(layout, dict) and "columns" in layout:
-        selected_columns = [col for col in layout["columns"] if col in columns]
-
-        # Filtrar las columnas visibles
-        filtered_rows = []
-        for r in rows:
-            filtered_row = {col: r[col] for col in selected_columns if col in r}
-            filtered_rows.append(filtered_row)
-        rows = filtered_rows
-        columns = selected_columns
+        selected = [c for c in layout["columns"] if c in columns]
+        if selected:
+            # rearmar filas con solo columnas seleccionadas
+            filtered_rows = []
+            for r in rows:
+                filtered_rows.append({c: r.get(c) for c in selected})
+            rows = filtered_rows
+            columns = selected
 
     return {
         "template": {
@@ -194,6 +204,7 @@ def preview_template(template_id: int, db: Session = Depends(get_db)):
             "description": tpl.description,
             "mode": tpl.mode,
             "layout_json": tpl.layout_json,
+            "rules_json": tpl.rules_json,
         },
         "query": {"id": q.id, "name": q.name, "sql_text": q.sql_text},
         "data": {"columns": columns, "rows": rows},
